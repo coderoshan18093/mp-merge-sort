@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 
 import os
 import shutil
@@ -8,7 +7,7 @@ import struct
 import numpy
 from itertools import islice
 import multiprocessing
-import Queue
+import queue
 import time
 import atexit
 import argparse
@@ -77,7 +76,7 @@ class Sorter(multiprocessing.Process):
 
                 i += 1
                 log.info('Sorted chunk {0}'.format(i))
-        except Exception, ex:
+        except Exception as ex:
             log.exception(ex)
             self.poison_pill.set()
 
@@ -100,9 +99,9 @@ class Merger(multiprocessing.Process):
             while not self.poison_pill.is_set() and self.c.value < self.m:
                 with self.l: # Atomically take two elements from queue
                     try: a = self.q.get(timeout=self.QUEUE_TIMEOUT)
-                    except Queue.Empty: continue
-                    try: b = self.q.get(timeout=self.QUEUE_TIMEOUT)
-                    except Queue.Empty:
+                    except queue.Empty: continue
+                    try: b =self.q.get(timeout=self.QUEUE_TIMEOUT)
+                    except queue.Empty:
                         self.q.put(a)   # Just put it back
                         continue
 
@@ -113,7 +112,7 @@ class Merger(multiprocessing.Process):
                 os.unlink(b)
                 self.q.put(new)
 
-        except Exception, ex:
+        except Exception as ex:
             log.exception(ex)
             self.poison_pill.set()
 
@@ -132,7 +131,7 @@ class Merger(multiprocessing.Process):
     def _read(self, f):
         read_buf = self.bs
         for chunk in iter(lambda: f.read(read_buf), ''):
-            for c in xrange(len(chunk)/4):
+            for c in range(len(chunk)/4):
                 yield struct.unpack('I', chunk[c*4:c*4+4])[0]
 
 class SortRunner(object):
@@ -207,7 +206,7 @@ class SortRunner(object):
         """Move output file from tmpdir to it's location"""
         try:
             final = self.queue.get(block=False)
-        except Queue.Empty:
+        except queue.Empty:
             sys.exit('Resulting file not found.')
         else:
             shutil.move(final, self.output)
@@ -226,7 +225,7 @@ class SortValidator(object):
             i = 0
             bs = self.bs
             for chunk in iter(lambda: f.read(bs), ''):
-                for c in xrange(len(chunk)/4):
+                for c in range(len(chunk)/4):
                     curr = struct.unpack_from('I', chunk[c*4:c*4+4])[0]
                     if curr < last:
                         sys.exit('Error at position {0}, values {1},{2}'.format(i, last, curr))
@@ -246,14 +245,14 @@ def main():
     
     if args.c:
         SortValidator(args.input, args.output, args.bs).run()
-        print 'OK'
+        print ('OK')
         return
 
     if args.bs % 4 or not args.smc > 0 or (args.j and args.j < 0) or (args.t and not os.path.isdir(args.t)):
         sys.exit('Bad input parameter')
 
     try: SortRunner(args.input, args.output, args.t, args.j, args.bs, args.smc).run()
-    except Exception, ex:
+    except Exception as ex:
         log.exception(ex)
         sys.exit()
 
